@@ -27,9 +27,16 @@ interface TicketmasterEvent {
 // Ticketmaster Discovery API (free, self-serve key from https://developer.ticketmaster.com/)
 // surfaces real dated events — concerts, festivals, sports — that a static Places search
 // can't, since those aren't permanent venues so much as time-bound happenings.
-export async function searchEvents(location: string, startDate: string, endDate: string): Promise<EventMention[]> {
+// Ticketmaster lists one entry per showing, so results are de-duplicated by name and venue
+// before trimming. `failed` is true when the request itself errored (for example a bad or
+// expired key), as opposed to a search that legitimately found nothing.
+export async function searchEvents(
+  location: string,
+  startDate: string,
+  endDate: string,
+): Promise<{ events: EventMention[]; failed: boolean }> {
   const apiKey = process.env.TICKETMASTER_API_KEY;
-  if (!apiKey || !isTicketmasterConfigured()) return [];
+  if (!apiKey || !isTicketmasterConfigured()) return { events: [], failed: false };
 
   const city = location.split(',')[0].trim();
   const params = new URLSearchParams({
@@ -37,7 +44,7 @@ export async function searchEvents(location: string, startDate: string, endDate:
     city,
     startDateTime: `${startDate}T00:00:00Z`,
     endDateTime: `${endDate}T23:59:59Z`,
-    size: '10',
+    size: '50',
     sort: 'relevance,desc',
   });
 
@@ -45,13 +52,21 @@ export async function searchEvents(location: string, startDate: string, endDate:
     const res = await fetch(`https://app.ticketmaster.com/discovery/v2/events.json?${params.toString()}`);
     if (!res.ok) {
       console.error('Ticketmaster error:', res.status, await res.text());
-      return [];
+      return { events: [], failed: true };
     }
 
     const data = await res.json();
     const events: TicketmasterEvent[] = data?._embedded?.events ?? [];
 
-    return events.map((e) => {
+    const seen = new Set<string>();
+    const unique = events.filter((e) => {
+      const key = `${e.name}|${e._embedded?.venues?.[0]?.name}`.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    const mapped = unique.slice(0, 10).map((e) => {
       const venue = e._embedded?.venues?.[0];
       const lat = venue?.location?.latitude ? Number(venue.location.latitude) : undefined;
       const lng = venue?.location?.longitude ? Number(venue.location.longitude) : undefined;
@@ -64,8 +79,9 @@ export async function searchEvents(location: string, startDate: string, endDate:
         segment: e.classifications?.[0]?.segment?.name ?? '',
       };
     });
+    return { events: mapped, failed: false };
   } catch (error) {
     console.error('Ticketmaster fetch failed:', error);
-    return [];
+    return { events: [], failed: true };
   }
 }

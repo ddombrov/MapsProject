@@ -159,7 +159,10 @@ export async function POST(request: Request) {
     let eventsSection = '';
     if (weights.ticketmaster > 0 && startDate) {
       const tripEndDate = addDays(startDate, days - 1);
-      const events = await searchEvents(location, startDate, tripEndDate);
+      const { events, failed } = await searchEvents(location, startDate, tripEndDate);
+      if (failed) {
+        warnings.push('Ticketmaster events could not be loaded — check that TICKETMASTER_API_KEY is valid. Continuing without events.');
+      }
       if (events.length > 0) {
         eventsSection = `\n      Local events during this trip (from Ticketmaster; use the given coordinates if you feature one as an Attraction spot):\n      ${events
           .map((e) => `- ${e.date}: "${e.name}" at ${e.venue}${e.lat && e.lng ? ` (lat ${e.lat}, lng ${e.lng})` : ''} [${e.segment}]`)

@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f7f5;
+  --foreground: #1c1c1c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: #1b2a41;
+  --color-primary-hover: #14202f;
+  --color-accent: #d98e33;
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Google's InfoWindow reserves a full row above the content for its close button,
+   which shows up as dead space above our compact SpotDetail cards. Float the close
+   button instead of letting it push the content down. */
+.gm-style-iw-chr {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: auto !important;
+}
+.gm-style-iw-d {
+  overflow: hidden !important;
+}
+
+/* Touch screens: iOS Safari zooms the whole page when a focused field is under 16px, so keep
+   fields at 16px there. Overscroll is off so pulling on the map doesn't refresh the page. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+html,
+body {
+  overscroll-behavior: none;
+}

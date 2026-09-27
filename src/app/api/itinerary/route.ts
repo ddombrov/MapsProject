@@ -17,29 +17,48 @@ import { FULL_BUILDS_PER_WINDOW } from '@/lib/limits';
 
 const MAX_SPOTS = 50;
 const SCOPED_REGENS_PER_WINDOW = 20;
-const MAX_PLACES_PER_QUERY = 20; // Google Places Text Search's hard per-request cap
+const MAX_PLACES_PER_PAGE = 20; // Google Places Text Search's hard per-request cap
+const MAX_PAGES = 3; // Text Search stops paginating well before this in practice
 
-async function fetchPlaces(textQuery: string, pageSize: number): Promise<{ places: RawPlace[]; error?: string }> {
-  if (pageSize <= 0) return { places: [] };
+// A single request maxes out at 20 results (Google's hard per-request cap), which was
+// silently capping every category near ~14-20 unique places regardless of how many were
+// actually available in that city — the field mask below didn't even ask for
+// nextPageToken, so the code had no way to know more existed. Paging through it (verified
+// live: a second Halifax page returned 20 more places with zero overlap with the first)
+// lets a category go past 20 when the city has that many real candidates.
+async function fetchPlaces(textQuery: string, targetCount: number): Promise<{ places: RawPlace[]; error?: string }> {
+  if (targetCount <= 0) return { places: [] };
 
-  const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY!,
-      'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.rating,places.reviews,places.regularOpeningHours',
-    },
-    body: JSON.stringify({ textQuery, pageSize: Math.min(pageSize, MAX_PLACES_PER_QUERY) }),
-  });
+  const places: RawPlace[] = [];
+  let pageToken: string | undefined;
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('Places API error:', errText);
-    return { places: [], error: errText };
+  for (let page = 0; page < MAX_PAGES && places.length < targetCount; page++) {
+    const body: { textQuery: string; pageSize: number; pageToken?: string } = { textQuery, pageSize: MAX_PLACES_PER_PAGE };
+    if (pageToken) body.pageToken = pageToken;
+
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY!,
+        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.rating,places.reviews,places.regularOpeningHours,nextPageToken',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('Places API error:', errText);
+      return places.length > 0 ? { places } : { places: [], error: errText };
+    }
+
+    const data = (await res.json()) as { places?: RawPlace[]; nextPageToken?: string };
+    places.push(...(data.places || []));
+    pageToken = data.nextPageToken;
+    if (!pageToken) break;
   }
 
-  const data = await res.json();
-  return { places: data.places || [] };
+  return { places };
 }
 
 export async function POST(request: Request) {
@@ -95,7 +114,7 @@ export async function POST(request: Request) {
     const warnings: string[] = [];
     const weights = { ...sourceWeights };
     if (weights.reddit > 0 && !isRedditConfigured()) {
-      warnings.push('Reddit is not connected yet — add REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET (free, from https://www.reddit.com/prefs/apps) to enable it — see the README. Its weight was redistributed to Google.');
+      warnings.push('Reddit weight was redistributed to Google — Reddit blocks most automated search traffic, so live results are limited even with an app key.');
       weights.reddit = 0;
     }
     if (weights.ticketmaster > 0 && !isTicketmasterConfigured()) {

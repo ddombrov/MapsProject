@@ -876,15 +876,6 @@ export default function Home() {
                   <label className="flex items-start gap-2 text-xs text-gray-600">
                     <input
                       type="checkbox"
-                      checked={hiddenGemMode}
-                      onChange={(e) => setHiddenGemMode(e.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>Prioritize hidden gems and local favorites over well-known tourist spots</span>
-                  </label>
-                  <label className="flex items-start gap-2 text-xs text-gray-600">
-                    <input
-                      type="checkbox"
                       checked={optimizeRoutes}
                       onChange={(e) => setOptimizeRoutes(e.target.checked)}
                       className="mt-0.5"
@@ -894,7 +885,13 @@ export default function Home() {
                 </div>
               </PreferenceTagInput>
 
-              <SourceWeightSliders value={sourceWeights} onChange={setSourceWeights} config={sourceConfig} />
+              <SourceWeightSliders
+                value={sourceWeights}
+                onChange={setSourceWeights}
+                config={sourceConfig}
+                aiEnabled={hiddenGemMode}
+                onAiChange={setHiddenGemMode}
+              />
             </div>
           )}
 

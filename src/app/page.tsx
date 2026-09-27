@@ -871,19 +871,17 @@ export default function Home() {
               <SingleChoiceGroup label="Pace" options={PACE_OPTIONS} value={pace} onChange={(v) => setPace(v as Pace)} />
               <SingleChoiceGroup label="Transportation" options={TRANSPORT_OPTIONS} value={transportation} onChange={(v) => setTransportation(v as Transportation)} />
 
-              <PreferenceTagInput value={otherSelection} onChange={setOtherSelection}>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-start gap-2 text-xs text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={optimizeRoutes}
-                      onChange={(e) => setOptimizeRoutes(e.target.checked)}
-                      className="mt-0.5"
-                    />
-                    <span>Optimize each day&apos;s route to reduce backtracking (may override date-specific timing, like weekend/weekday placement)</span>
-                  </label>
-                </div>
-              </PreferenceTagInput>
+              <label className="flex items-start gap-2 text-xs text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={optimizeRoutes}
+                  onChange={(e) => setOptimizeRoutes(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>Optimize each day&apos;s route to reduce backtracking (may override date-specific timing, like weekend/weekday placement)</span>
+              </label>
+
+              <PreferenceTagInput value={otherSelection} onChange={setOtherSelection} />
 
               <SourceWeightSliders
                 value={sourceWeights}

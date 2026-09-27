@@ -138,14 +138,19 @@ export function SourceWeightSliders({ value, onChange, config, aiEnabled, onAiCh
           })}
 
           <div>
-            <label className="flex items-center justify-between text-xs cursor-pointer">
+            <div className="flex items-center justify-between text-xs mb-0.5">
               <span className="text-gray-600">AI (hidden gems)</span>
-              <input
-                type="checkbox"
-                checked={aiEnabled}
-                onChange={(e) => onAiChange(e.target.checked)}
-              />
-            </label>
+              <span className="text-gray-400">{aiEnabled ? 100 : 0}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={100}
+              value={aiEnabled ? 100 : 0}
+              onChange={(e) => onAiChange(Number(e.target.value) >= 50)}
+              className="w-full"
+            />
             <p className="text-[10px] text-gray-400 mt-0.5">
               When on, the model favors hidden gems and local favorites over obvious tourist spots.
             </p>

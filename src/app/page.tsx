@@ -228,6 +228,7 @@ export default function Home() {
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [shareEncoded, setShareEncoded] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
+  const shareCopiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [mobilePane, setMobilePane] = useState<'plan' | 'view'>('plan');
   const [notice, setNotice] = useState<string | null>(null);
   const [movingItem, setMovingItem] = useState<ItineraryItem | null>(null);
@@ -651,9 +652,11 @@ export default function Home() {
     });
     setShareEncoded(encoded);
     setShareCopied(false);
+    // Opening the dialog copies the link as a convenience, but "Copied!" only shows once the
+    // user actually clicks the button below — otherwise it'd read "Copied!" before they'd done
+    // anything themselves.
     navigator.clipboard
       .writeText(window.location.origin + '/' + buildShareHash(encoded, currentShareOptions))
-      .then(() => setShareCopied(true))
       .catch(() => {});
   };
 
@@ -1385,7 +1388,11 @@ export default function Home() {
                   onClick={() =>
                     navigator.clipboard
                       .writeText(shareUrl ?? '')
-                      .then(() => setShareCopied(true))
+                      .then(() => {
+                        setShareCopied(true);
+                        if (shareCopiedTimeoutRef.current) clearTimeout(shareCopiedTimeoutRef.current);
+                        shareCopiedTimeoutRef.current = setTimeout(() => setShareCopied(false), 2000);
+                      })
                       .catch(() => {})
                   }
                   className="px-3 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover"

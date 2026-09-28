@@ -1241,6 +1241,10 @@ export default function Home() {
             </div>
           ) : (
             <div className="relative w-full h-full">
+            {/* Pinned at a known stacking level so the overlay below can be dropped
+                unambiguously beneath it (an explicit z-index of 0 doesn't reliably beat
+                z-index: auto — DOM order still wins ties — so both sides need real numbers). */}
+            <div className="relative z-10 w-full h-full">
             <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
               <Map
                 key={mapKey + '-' + mobilePane}
@@ -1305,8 +1309,14 @@ export default function Home() {
                 )}
               </Map>
             </APIProvider>
+            </div>
 
-            <div className="absolute top-4 right-4 md:right-24 z-10 flex flex-col items-end gap-2">
+            {/* The InfoWindow is Google's own pane, nested inside the Map's DOM subtree —
+                raising its z-index directly isn't possible, so a selected spot's popup is
+                kept on top by dropping this overlay below the map's own stacking level
+                instead, rather than raising the map above it permanently (which would bury
+                these buttons under the map tiles even with nothing selected). */}
+            <div className={`absolute top-4 right-4 md:right-24 flex flex-col items-end gap-2 ${selectedSpot ? 'z-0' : 'z-20'}`}>
               {addPlaceMenu}
               <OpenInGoogleMaps links={mapsLinks} selectedDay={mapDayFilter} singleDay={singleDay} />
             </div>

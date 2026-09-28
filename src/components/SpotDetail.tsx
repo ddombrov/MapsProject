@@ -24,7 +24,7 @@ export function SpotDetail({ item, onEdit, onMove, dayCount = 1, showDay = true,
 
   return (
     <div className="p-2 max-w-xs font-sans">
-      <div className="flex items-center justify-between mb-0.5 pr-5">
+      <div className="flex items-center justify-between mb-0.5 pr-7">
         <div className="text-[10px] font-bold text-primary uppercase tracking-wider">
           {showDay ? `Day ${item.day} • ` : ''}{item.slot}
         </div>

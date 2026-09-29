@@ -23,6 +23,9 @@ export interface ItineraryItem {
   redditMentioned?: boolean;
   reviewHighlights?: string[];
   openingHours?: OpeningHours;
+  // Google's place ID for this spot, when known — lets the shared city pool re-verify a
+  // reused place's hours against Google again later rather than trusting a stale cache.
+  placeId?: string;
 }
 
 export type ChatOp =

@@ -14,6 +14,7 @@ import { generateItinerary } from '@/lib/generateItinerary';
 import type { RawPlace } from '@/lib/rawPlace';
 import { checkRateLimit, clientIp, tooManyRequests, TEN_MINUTES_MS } from '@/lib/rateLimit';
 import { FULL_BUILDS_PER_WINDOW } from '@/lib/limits';
+import { isCityPoolConfigured, cityKeyFor, getCityPoolCandidates, contributePlaces } from '@/lib/cityPool';
 
 const MAX_SPOTS = 50;
 const SCOPED_REGENS_PER_WINDOW = 20;
@@ -41,7 +42,7 @@ async function fetchPlaces(textQuery: string, targetCount: number): Promise<{ pl
       headers: {
         'Content-Type': 'application/json',
         'X-Goog-Api-Key': process.env.GOOGLE_PLACES_API_KEY!,
-        'X-Goog-FieldMask': 'places.displayName,places.formattedAddress,places.location,places.rating,places.reviews,places.regularOpeningHours,nextPageToken',
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.reviews,places.regularOpeningHours,nextPageToken',
       },
       body: JSON.stringify(body),
     });
@@ -150,6 +151,19 @@ export async function POST(request: Request) {
     if (foodResult.error && attractionResult.error) {
       refundAttempt();
       return NextResponse.json({ error: 'Failed to fetch places' }, { status: 502 });
+    }
+
+    // Extra candidates accumulated from everyone's past trips to this same city, on top of
+    // today's fresh search — skipped entirely (never blocking or failing the request) if
+    // Supabase isn't configured, slow, or down. See cityPool.ts.
+    const cityKey = cityKeyFor(location);
+    if (isCityPoolConfigured()) {
+      const alreadyHaveKeys = new Set(
+        [...foodResult.places, ...attractionResult.places].map((p) => `${p.displayName?.text ?? ''}|${p.formattedAddress ?? ''}`.toLowerCase()),
+      );
+      const pool = await getCityPoolCandidates(cityKey, alreadyHaveKeys);
+      foodResult.places = [...foodResult.places, ...pool.food];
+      attractionResult.places = [...attractionResult.places, ...pool.attraction];
     }
 
     const rawPlaces = mergePlaces(foodResult.places, attractionResult.places);
@@ -293,6 +307,11 @@ export async function POST(request: Request) {
       reviewHighlights: findReviewHighlights(rawPlaces, item.name, item.address, preferenceTerms),
       openingHours: findOpeningHours(rawPlaces, item.name, item.address),
     }));
+
+    // Adds this trip's real places back to the shared pool for next time.
+    if (isCityPoolConfigured()) {
+      await contributePlaces(cityKey, itineraryWithReviews, 'google');
+    }
 
     const response = { itinerary: itineraryWithReviews, warnings };
 

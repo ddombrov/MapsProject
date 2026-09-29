@@ -5,6 +5,7 @@ export interface RawPlaceReview {
 }
 
 export interface RawPlace {
+  id?: string;
   displayName?: { text?: string };
   formattedAddress?: string;
   location?: { latitude?: number; longitude?: number };

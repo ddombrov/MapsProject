@@ -19,7 +19,11 @@ export function repairItinerary(
   foodPool: RawPlace[],
   attractionPool: RawPlace[],
 ): { itinerary: ItineraryItem[]; hadUnresolvable: boolean } {
-  const realKeys = new Set([...foodPool, ...attractionPool].map(rawKey));
+  const allPool = [...foodPool, ...attractionPool];
+  const realKeys = new Set(allPool.map(rawKey));
+  // Keyed lookup so a matched item can carry its real Google place ID forward — needed to
+  // re-verify a pooled place's hours next time it's reused, rather than trusting it forever.
+  const byKey = new Map(allPool.map((p) => [rawKey(p), p]));
   const available: Record<ItineraryItem['category'], RawPlace[]> = {
     Food: [...foodPool],
     Attraction: [...attractionPool],
@@ -39,7 +43,7 @@ export function repairItinerary(
     if (isReal && !isDuplicate) {
       usedKeys.add(key);
       removeFromPool(item.category, key);
-      return item;
+      return { ...item, placeId: byKey.get(key)?.id };
     }
 
     const replacement = available[item.category][0];
@@ -60,6 +64,7 @@ export function repairItinerary(
       lat: replacement.location?.latitude ?? item.lat,
       lng: replacement.location?.longitude ?? item.lng,
       notes: `Recommended ${item.category.toLowerCase()} spot for Day ${item.day}.`,
+      placeId: replacement.id,
     };
   });
 

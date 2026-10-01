@@ -254,6 +254,7 @@ export default function Home() {
   const [listDropTarget, setListDropTarget] = useState<{ item: ItineraryItem; position: DropPosition } | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const [language, setLanguage] = useState('en');
+  const [translating, setTranslating] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -279,7 +280,7 @@ export default function Home() {
     } catch {
       // Not persisted, but the page still translates for this session.
     }
-    if (rootRef.current) applyTranslation(rootRef.current, language, '/api/translate');
+    if (rootRef.current) applyTranslation(rootRef.current, language, '/api/translate', setTranslating);
   }, [language]);
 
   useEffect(() => {
@@ -1180,7 +1181,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 mb-1.5">
+            <div className="flex items-center gap-1 mb-1.5">
               <select
                 data-no-translate
                 value={language}
@@ -1192,6 +1193,9 @@ export default function Home() {
                   <option key={l.code} value={l.code}>{l.label}</option>
                 ))}
               </select>
+              {translating && (
+                <Loader2 data-no-translate size={14} className="animate-spin text-primary shrink-0 mr-0.5" aria-label="Translating" />
+              )}
               <div className="relative" ref={moreMenuRef}>
                 <button
                   onClick={() => setShowMoreMenu((v) => !v)}

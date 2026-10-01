@@ -60,12 +60,15 @@ function collect(root: HTMLElement): { textNodes: Text[]; attrEls: Element[] } {
   return { textNodes, attrEls };
 }
 
-async function translateMissing(texts: string[], lang: string, endpoint: string): Promise<Record<string, string>> {
-  const cache = loadCache(lang);
-  const unique = Array.from(new Set(texts.map((t) => t.trim()))).filter((t) => t && !(t in cache));
+// Only the strings not already cached locally — kept separate from the fetch itself so the
+// caller can apply what it already has instantly, before any network round trip.
+function findMissing(texts: string[], cache: Record<string, string>): string[] {
+  return Array.from(new Set(texts.map((t) => t.trim()))).filter((t) => t && !(t in cache));
+}
 
-  for (let i = 0; i < unique.length; i += BATCH_SIZE) {
-    const slice = unique.slice(i, i + BATCH_SIZE);
+async function fetchMissing(missing: string[], lang: string, endpoint: string, cache: Record<string, string>): Promise<void> {
+  for (let i = 0; i < missing.length; i += BATCH_SIZE) {
+    const slice = missing.slice(i, i + BATCH_SIZE);
     try {
       const res = await fetch(endpoint, {
         method: 'POST',
@@ -81,8 +84,24 @@ async function translateMissing(texts: string[], lang: string, endpoint: string)
       // applyTranslation call (the observer fires on every DOM change) retries them.
     }
   }
-  if (unique.length > 0) saveCache(lang, cache);
-  return cache;
+  if (missing.length > 0) saveCache(lang, cache);
+}
+
+function applyFromCache(textNodes: Text[], attrEls: Element[], cache: Record<string, string>) {
+  textNodes.forEach((node) => {
+    const original = originalText.get(node) || '';
+    const translated = cache[original.trim()];
+    if (translated) node.nodeValue = original.replace(original.trim(), translated);
+  });
+  attrEls.forEach((el) => {
+    const saved = originalAttr.get(el);
+    if (!saved) return;
+    for (const attr of TRANSLATABLE_ATTRS) {
+      const original = saved[attr];
+      const translated = original && cache[original.trim()];
+      if (translated) el.setAttribute(attr, translated);
+    }
+  });
 }
 
 let observer: MutationObserver | null = null;
@@ -90,6 +109,7 @@ let observerTimer: ReturnType<typeof setTimeout> | null = null;
 let applying = false;
 let currentLang = 'en';
 let currentEndpoint = '';
+let currentOnLoadingChange: ((loading: boolean) => void) | undefined;
 
 function restoreEnglish(textNodes: Text[], attrEls: Element[]) {
   textNodes.forEach((node) => {
@@ -105,9 +125,15 @@ function restoreEnglish(textNodes: Text[], attrEls: Element[]) {
   });
 }
 
-export async function applyTranslation(root: HTMLElement, lang: string, endpoint: string): Promise<void> {
+export async function applyTranslation(
+  root: HTMLElement,
+  lang: string,
+  endpoint: string,
+  onLoadingChange?: (loading: boolean) => void,
+): Promise<void> {
   currentLang = lang;
   currentEndpoint = endpoint;
+  if (onLoadingChange) currentOnLoadingChange = onLoadingChange;
   applying = true;
   observer?.disconnect();
 
@@ -142,23 +168,23 @@ export async function applyTranslation(root: HTMLElement, lang: string, endpoint
       ),
     ];
 
-    const cache = await translateMissing(sourceTexts, lang, endpoint);
-    if (currentLang !== lang) return; // language changed again while this batch was in flight
+    // Whatever's already cached (from an earlier switch, or another visitor entirely, via
+    // Supabase) applies immediately — no spinner, no network wait. Only genuinely new text
+    // needs a fetch, and only that triggers the loading indicator.
+    const cache = loadCache(lang);
+    applyFromCache(textNodes, attrEls, cache);
 
-    textNodes.forEach((node) => {
-      const original = originalText.get(node) || '';
-      const translated = cache[original.trim()];
-      if (translated) node.nodeValue = original.replace(original.trim(), translated);
-    });
-    attrEls.forEach((el) => {
-      const saved = originalAttr.get(el);
-      if (!saved) return;
-      for (const attr of TRANSLATABLE_ATTRS) {
-        const original = saved[attr];
-        const translated = original && cache[original.trim()];
-        if (translated) el.setAttribute(attr, translated);
-      }
-    });
+    const missing = findMissing(sourceTexts, cache);
+    if (missing.length === 0) return;
+
+    currentOnLoadingChange?.(true);
+    try {
+      await fetchMissing(missing, lang, endpoint, cache);
+      if (currentLang !== lang) return; // language changed again while this batch was in flight
+      applyFromCache(textNodes, attrEls, cache);
+    } finally {
+      currentOnLoadingChange?.(false);
+    }
   } finally {
     applying = false;
     observer ??= new MutationObserver(() => {

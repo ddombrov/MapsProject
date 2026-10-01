@@ -45,7 +45,7 @@ export function AddPlaceMenu({ onAdd, onImport }: Props) {
         </button>
       </div>
       {open && (
-        <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+        <div className="absolute right-0 mt-1 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden">
           <button
             type="button"
             onClick={() => {

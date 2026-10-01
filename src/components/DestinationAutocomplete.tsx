@@ -65,7 +65,7 @@ export function DestinationAutocomplete({ value, onChange }: Props) {
         autoComplete="off"
       />
       {open && suggestions.length > 0 && (
-        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
+        <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
           {suggestions.map((s) => (
             <button
               key={s}

@@ -49,7 +49,7 @@ export function OpenInGoogleMaps({ links, selectedDay, singleDay }: Props) {
         <Navigation size={14} /> Open in Google Maps <ChevronDown size={12} />
       </button>
       {open && (
-        <div className="absolute right-0 mt-1 w-full min-w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+        <div className="absolute right-0 mt-1 w-full min-w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden">
           {visible.map((link) => (
             <a
               key={link.day}

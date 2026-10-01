@@ -14,6 +14,7 @@ export interface ShareOptions {
   day: number | null; // null = all days
   routes: boolean;
   calendar: 'day' | 'week' | 'month';
+  language: string; // 'en' = default, not written to the link
 }
 
 // Only non-default options are written, to keep the link as short as possible.
@@ -24,6 +25,7 @@ export function buildShareHash(encodedTrip: string, options: ShareOptions): stri
   if (options.day !== null) parts.push(`day=${options.day}`);
   if (options.routes) parts.push('routes=1');
   if (options.view === 'calendar' && options.calendar !== 'month') parts.push(`cal=${options.calendar}`);
+  if (options.language !== 'en') parts.push(`lang=${options.language}`);
   return `#${parts.join('&')}`;
 }
 
@@ -42,6 +44,7 @@ export function parseShareHash(hash: string): { trip: string; options: ShareOpti
       day: Number.isInteger(day) && day >= 1 ? day : null,
       routes: params.get('routes') === '1',
       calendar: cal === 'day' || cal === 'week' ? cal : 'month',
+      language: params.get('lang') || 'en',
     },
   };
 }

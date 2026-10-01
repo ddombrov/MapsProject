@@ -43,6 +43,7 @@ import { DestinationAutocomplete } from '@/components/DestinationAutocomplete';
 import { ImportModal } from '@/components/ImportModal';
 import { sourcesForItem } from '@/lib/sources';
 import { getSpotEmoji } from '@/lib/spotEmoji';
+import { applyTranslation } from '@/lib/domTranslate';
 import { exportMapsCsv } from '@/lib/exportMapsCsv';
 import { exportIcal } from '@/lib/exportIcal';
 import {
@@ -90,6 +91,24 @@ const BUDGET_OPTIONS: Budget[] = ['No preference', 'Budget', 'Mid-range', 'Luxur
 const PARTY_OPTIONS: TravelParty[] = ['No preference', 'Solo', 'Couple', 'Family', 'Friends group'];
 const PACE_OPTIONS: Pace[] = ['No preference', 'Relaxed', 'Balanced', 'Packed'];
 const TRANSPORT_OPTIONS: Transportation[] = ['No preference', 'Walking / Transit', 'Car'];
+
+// Each language's own name, in its own script, so it's findable regardless of the page's
+// current language — the standard convention for a language switcher. Codes double as the
+// Google Maps JS API's own `language` param, which localizes the map's native UI directly.
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'pt', label: 'Português' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'zh-CN', label: '中文' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'ru', label: 'Русский' },
+];
 
 const DIET_OPTIONS = ['Vegan', 'Vegetarian', 'Gluten-Free', 'Dairy-Free', 'Halal', 'Kosher', 'Nut-Free', 'Shellfish-Free'];
 const ATTRACTION_OPTIONS = ['Iconic Landmarks', 'Waterparks', 'Family Fun', 'Nightlife', 'Sports', 'Museums & Culture', 'Nature & Outdoors', 'Shopping'];
@@ -234,6 +253,34 @@ export default function Home() {
   const [movingItem, setMovingItem] = useState<ItineraryItem | null>(null);
   const [listDropTarget, setListDropTarget] = useState<{ item: ItineraryItem; position: DropPosition } | null>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
+  const [language, setLanguage] = useState('en');
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // A shared link is authoritative about every option it carries, language included — the
+    // share-loading effect below applies it. Only fall back to the viewer's own saved
+    // preference on an ordinary (non-shared) visit, so the two can never race each other.
+    if (parseShareHash(window.location.hash)) return;
+    // A setTimeout, not a bare call — the lint rule here (react-hooks/set-state-in-effect)
+    // only allows setState from inside a promise .then, an event handler, or a timeout.
+    setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem('tp-language');
+        if (saved) setLanguage(saved);
+      } catch {
+        // Private browsing or storage disabled — just starts in English every time.
+      }
+    }, 0);
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('tp-language', language);
+    } catch {
+      // Not persisted, but the page still translates for this session.
+    }
+    if (rootRef.current) applyTranslation(rootRef.current, language, '/api/translate');
+  }, [language]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -278,6 +325,7 @@ export default function Home() {
       setMapDayFilter(shared.options.day ?? 'all');
       setShowRoutes(shared.options.routes);
       setCalendarSubView(shared.options.calendar);
+      setLanguage(shared.options.language);
       setMobilePane('view');
     });
   }, []);
@@ -637,6 +685,7 @@ export default function Home() {
     day: mapDayFilter === 'all' ? null : mapDayFilter,
     routes: showRoutes,
     calendar: calendarSubView,
+    language,
   };
 
   const shareUrl = shareEncoded
@@ -716,6 +765,7 @@ export default function Home() {
         day: mapDayFilter === 'all' ? null : mapDayFilter,
         routes: showRoutes,
         calendar: calendarSubView,
+        language,
       });
       window.history.replaceState(null, '', window.location.pathname + window.location.search + hash);
     }, 400);
@@ -724,7 +774,7 @@ export default function Home() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [itinerary, location, days, hasBothDates, startDate, viewMode, mapDayFilter, showRoutes, calendarSubView]);
+  }, [itinerary, location, days, hasBothDates, startDate, viewMode, mapDayFilter, showRoutes, calendarSubView, language]);
 
   // The Routes button only means something once a day has at least two stops to connect.
   const canShowRoutes = mapDayRoutes.some((r) => r.path.length >= 2);
@@ -735,7 +785,7 @@ export default function Home() {
   const addPlaceMenu = <AddPlaceMenu onAdd={() => openAddPlace()} onImport={() => setShowImport(true)} />;
 
   return (
-    <div className="relative flex h-dvh w-screen overflow-hidden bg-background font-sans">
+    <div ref={rootRef} className="relative flex h-dvh w-screen overflow-hidden bg-background font-sans">
       {/* Sidebar Controls & List */}
       <div
         className={`h-full bg-white border-r border-gray-200 flex-col shadow-lg z-10 transition-all w-full p-6 max-md:p-4 max-md:pb-20 overflow-y-auto ${mobilePane === 'plan' ? 'flex' : 'hidden md:flex'} ${
@@ -1131,6 +1181,17 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-1.5 mb-1.5">
+              <select
+                data-no-translate
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                aria-label="Language"
+                className="text-xs px-2 py-1.5 rounded-md font-medium bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
               <div className="relative" ref={moreMenuRef}>
                 <button
                   onClick={() => setShowMoreMenu((v) => !v)}
@@ -1140,7 +1201,7 @@ export default function Home() {
                   <Share2 size={14} /> Share <ChevronDown size={12} />
                 </button>
                 {showMoreMenu && (
-                  <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-20 overflow-hidden">
+                  <div className="absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden">
                     <button
                       onClick={() => {
                         setShowMoreMenu(false);
@@ -1254,7 +1315,7 @@ export default function Home() {
                 unambiguously beneath it (an explicit z-index of 0 doesn't reliably beat
                 z-index: auto — DOM order still wins ties — so both sides need real numbers). */}
             <div className="relative z-10 w-full h-full">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
+            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} language={language}>
               <Map
                 key={mapKey + '-' + mobilePane}
                 style={{ width: '100%', height: '100%' }}

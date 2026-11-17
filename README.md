@@ -1,4 +1,6 @@
-# Itinerary Planner
+# AI Vacation Planner
+
+Live: https://ai-vacation-planner.pages.dev (also embedded at https://danieldombrovsky.com/trip-planner/)
 
 Plan a trip on a map. Enter a destination and a length (up to 7 days) and it builds a
 day-by-day itinerary of food and attractions from real Google Places data, optionally
@@ -31,6 +33,7 @@ You need Node.js 20 or newer.
 ```bash
 npm install
 cp .env.example .env.local   # then fill in your keys
+cp .env.local .dev.vars      # the same keys, for wrangler pages dev
 npm run dev
 ```
 
@@ -71,17 +74,22 @@ back. The part after `#` is never sent to a server.
 ## Development
 
 ```bash
-npm run dev     # start the dev server
-npm run build   # production build
+npm run dev     # start the dev server (pages only; the API needs npm run cf:dev)
+npm run build   # static build into out/
+npm run cf:dev  # serve out/ with the API (Pages Functions) on :8788
+npm run deploy  # build and publish to Cloudflare Pages
 npm run lint    # eslint
 npx tsc --noEmit
 ```
 
-Built with Next.js (App Router), React, TypeScript, and Tailwind CSS, using
-`@vis.gl/react-google-maps`.
+Built with Next.js (App Router, static export), React, TypeScript, and Tailwind CSS, using
+`@vis.gl/react-google-maps`. The server side is Cloudflare Pages Functions. Put the keys in
+the Pages project as secrets, and allow the site's address as an HTTP referrer on the Maps
+JavaScript key.
 
 ```
-src/app/            the page and the API routes (itinerary, chat, geocode, directions, ...)
+src/app/            the page
+functions/api/      the API (itinerary, chat, geocode, directions, ...) as Pages Functions
 src/components/     map, calendar, table, dialogs, and form pieces
 src/lib/            generation, place matching, dates, sharing, rate limits, and other logic
 ```

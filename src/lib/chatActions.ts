@@ -120,7 +120,7 @@ export async function interpretChatMessage(
     throw new Error(`OpenAI request failed: ${await res.text()}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { choices: { message: { content: string } }[] };
   const parsed = JSON.parse(data.choices[0].message.content) as ChatInterpretation;
 
   const actions = (parsed.actions ?? []).map((a) => ({

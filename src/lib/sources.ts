@@ -1,4 +1,4 @@
-import type { ItineraryItem } from '@/lib/types';
+import type { ItineraryItem } from './types';
 
 export function sourcesForItem(item: ItineraryItem): string {
   const sources = ['Google Places'];

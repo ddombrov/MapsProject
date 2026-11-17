@@ -55,7 +55,7 @@ export async function searchEvents(
       return { events: [], failed: true };
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as { _embedded?: { events?: TicketmasterEvent[] } };
     const events: TicketmasterEvent[] = data?._embedded?.events ?? [];
 
     const seen = new Set<string>();

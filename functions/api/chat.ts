@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server';
-import { enforceRateLimit } from '@/lib/rateLimit';
-import { interpretChatMessage } from '@/lib/chatActions';
-import { pickOpeningHours } from '@/lib/openingHours';
-import type { RawPlace } from '@/lib/rawPlace';
-import type { ChatOp, ItineraryItem } from '@/lib/types';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { interpretChatMessage } from '../../src/lib/chatActions';
+import { pickOpeningHours } from '../../src/lib/openingHours';
+import type { RawPlace } from '../../src/lib/rawPlace';
+import type { ChatOp, ItineraryItem } from '../../src/lib/types';
 
 type SearchPlace = RawPlace & { types?: string[] };
 
@@ -29,11 +30,12 @@ async function searchPlaces(textQuery: string): Promise<SearchPlace[] | null> {
     body: JSON.stringify({ textQuery, pageSize: 6 }),
   });
   if (!res.ok) return null;
-  const data = await res.json();
+  const data = (await res.json()) as any;
   return data.places ?? [];
 }
 
-export async function POST(request: Request) {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  installEnv(env);
   const limited = enforceRateLimit(request, 'chat', 30);
   if (limited) return limited;
 
@@ -46,14 +48,14 @@ export async function POST(request: Request) {
     };
 
     if (!message?.trim() || !location || !days) {
-      return NextResponse.json({ error: 'message, location, and days are required' }, { status: 400 });
+      return Response.json({ error: 'message, location, and days are required' }, { status: 400 });
     }
 
     const items = itinerary ?? [];
     const { actions, reply } = await interpretChatMessage(message.trim(), location, days, items);
 
     if (actions.length === 0) {
-      return NextResponse.json({
+      return Response.json({
         ops: [],
         reply: reply || 'I can add, remove, or swap places — try "swap the pizza place for something vegan".',
       });
@@ -128,9 +130,9 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ ops, reply: notes.join(' ') });
+    return Response.json({ ops, reply: notes.join(' ') });
   } catch (error) {
     console.error('Chat error:', error);
-    return NextResponse.json({ error: 'Failed to process that request.' }, { status: 500 });
+    return Response.json({ error: 'Failed to process that request.' }, { status: 500 });
   }
-}
+};

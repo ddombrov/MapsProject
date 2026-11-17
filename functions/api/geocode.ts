@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { enforceRateLimit } from '@/lib/rateLimit';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import { enforceRateLimit } from '../../src/lib/rateLimit';
 
 interface GeocodeResult {
   formatted_address: string;
@@ -22,7 +23,8 @@ function findLocality(results: GeocodeResult[]): string | null {
   return null;
 }
 
-export async function GET(request: Request) {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  installEnv(env);
   const limited = enforceRateLimit(request, 'geocode', 200);
   if (limited) return limited;
 
@@ -32,7 +34,7 @@ export async function GET(request: Request) {
   const lng = searchParams.get('lng');
 
   if (!address && !(lat && lng)) {
-    return NextResponse.json({ error: 'address, or lat and lng, are required' }, { status: 400 });
+    return Response.json({ error: 'address, or lat and lng, are required' }, { status: 400 });
   }
 
   const query = address ? `address=${encodeURIComponent(address)}` : `latlng=${lat},${lng}`;
@@ -40,21 +42,21 @@ export async function GET(request: Request) {
 
   try {
     const res = await fetch(url);
-    const data = await res.json();
+    const data = (await res.json()) as any;
 
     if (data.status !== 'OK' || !data.results?.[0]) {
       if (data.status === 'REQUEST_DENIED') {
         console.error('Geocoding API request denied:', data.error_message);
-        return NextResponse.json(
+        return Response.json(
           { error: 'Geocoding API is not enabled for this key — enable it in Google Cloud Console alongside Maps/Places.' },
           { status: 502 },
         );
       }
-      return NextResponse.json({ error: 'Could not find that address' }, { status: 404 });
+      return Response.json({ error: 'Could not find that address' }, { status: 404 });
     }
 
     const result = data.results[0];
-    return NextResponse.json({
+    return Response.json({
       formattedAddress: result.formatted_address,
       locality: findLocality(data.results),
       lat: result.geometry.location.lat,
@@ -62,6 +64,6 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Geocode error:', error);
-    return NextResponse.json({ error: 'Failed to geocode address' }, { status: 500 });
+    return Response.json({ error: 'Failed to geocode address' }, { status: 500 });
   }
-}
+};

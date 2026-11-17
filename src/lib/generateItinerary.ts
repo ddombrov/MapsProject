@@ -92,7 +92,7 @@ async function generateWithOpenAI(prompt: string): Promise<RawItineraryItem[]> {
     throw new Error(`OpenAI request failed: ${errText}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { choices: { message: { content: string } }[] };
   const parsed = JSON.parse(data.choices[0].message.content).itinerary;
   if (!Array.isArray(parsed) || parsed.length === 0) {
     throw new Error('OpenAI returned an empty or invalid itinerary');

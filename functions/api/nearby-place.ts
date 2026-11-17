@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
-import { enforceRateLimit } from '@/lib/rateLimit';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import { enforceRateLimit } from '../../src/lib/rateLimit';
 
 interface NearbySearchResult {
   places?: Array<{
@@ -14,7 +15,8 @@ interface NearbySearchResult {
 // sidewalk to some unrelated place down the block, so this stays deliberately tight.
 const RADIUS_METERS = 40;
 
-export async function GET(request: Request) {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  installEnv(env);
   const limited = enforceRateLimit(request, 'nearby-place', 100);
   if (limited) return limited;
 
@@ -23,7 +25,7 @@ export async function GET(request: Request) {
   const lng = searchParams.get('lng');
 
   if (!lat || !lng) {
-    return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
+    return Response.json({ error: 'lat and lng are required' }, { status: 400 });
   }
 
   const res = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
@@ -41,14 +43,14 @@ export async function GET(request: Request) {
   });
 
   if (!res.ok) {
-    return NextResponse.json({ name: null, address: null });
+    return Response.json({ name: null, address: null });
   }
 
   const data: NearbySearchResult = await res.json();
   const place = data.places?.[0];
 
-  return NextResponse.json({
+  return Response.json({
     name: place?.displayName?.text ?? null,
     address: place?.formattedAddress ?? null,
   });
-}
+};

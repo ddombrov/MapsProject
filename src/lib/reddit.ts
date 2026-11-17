@@ -28,7 +28,7 @@ async function getAccessToken(): Promise<string | null> {
   const res = await fetch('https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
-      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
       'Content-Type': 'application/x-www-form-urlencoded',
       'User-Agent': USER_AGENT,
     },
@@ -40,7 +40,7 @@ async function getAccessToken(): Promise<string | null> {
     return null;
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { access_token: string; expires_in: number };
   cachedToken = { token: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 };
   return cachedToken.token;
 }
@@ -71,7 +71,7 @@ export async function searchReddit(query: string, subreddit?: string): Promise<R
       return [];
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as { data?: { children?: { data: { title?: string; selftext?: string; subreddit?: string; score?: number; permalink?: string } }[] } };
     const posts = data?.data?.children ?? [];
 
     return posts.map((post: { data: { title?: string; selftext?: string; subreddit?: string; score?: number; permalink?: string } }) => ({

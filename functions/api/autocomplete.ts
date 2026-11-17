@@ -1,7 +1,9 @@
-import { NextResponse } from 'next/server';
-import { enforceRateLimit } from '@/lib/rateLimit';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import { enforceRateLimit } from '../../src/lib/rateLimit';
 
-export async function GET(request: Request) {
+export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
+  installEnv(env);
   const limited = enforceRateLimit(request, 'autocomplete', 400);
   if (limited) return limited;
 
@@ -9,7 +11,7 @@ export async function GET(request: Request) {
   const input = searchParams.get('input');
 
   if (!input || input.trim().length < 2) {
-    return NextResponse.json({ suggestions: [] });
+    return Response.json({ suggestions: [] });
   }
 
   try {
@@ -25,17 +27,17 @@ export async function GET(request: Request) {
     if (!res.ok) {
       const errText = await res.text();
       console.error('Autocomplete API error:', errText);
-      return NextResponse.json({ suggestions: [] });
+      return Response.json({ suggestions: [] });
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const suggestions = (data.suggestions || [])
       .map((s: { placePrediction?: { text?: { text?: string } } }) => s.placePrediction?.text?.text)
       .filter((text: string | undefined): text is string => Boolean(text));
 
-    return NextResponse.json({ suggestions });
+    return Response.json({ suggestions });
   } catch (error) {
     console.error('Autocomplete fetch failed:', error);
-    return NextResponse.json({ suggestions: [] });
+    return Response.json({ suggestions: [] });
   }
-}
+};

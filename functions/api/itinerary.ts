@@ -1,20 +1,21 @@
-import { NextResponse } from 'next/server';
-import type { ItineraryItem, ItineraryRequest } from '@/lib/types';
-import { buildDayList, addDays, MAX_TRIP_DAYS } from '@/lib/dates';
-import { searchRedditMultiSource, isRedditConfigured } from '@/lib/reddit';
-import { clusterByDay } from '@/lib/clusterByDay';
-import { findReviewHighlights } from '@/lib/reviewHighlights';
-import { repairItinerary } from '@/lib/repairItinerary';
-import { searchEvents, isTicketmasterConfigured } from '@/lib/ticketmaster';
-import { mergePlaces } from '@/lib/mergePlaces';
-import { findOpeningHours } from '@/lib/openingHours';
-import { trimPlacesForPrompt } from '@/lib/trimPlacesForPrompt';
-import { annotateReviewEvidence } from '@/lib/reviewEvidence';
-import { generateItinerary } from '@/lib/generateItinerary';
-import type { RawPlace } from '@/lib/rawPlace';
-import { checkRateLimit, clientIp, tooManyRequests, TEN_MINUTES_MS } from '@/lib/rateLimit';
-import { FULL_BUILDS_PER_WINDOW } from '@/lib/limits';
-import { isCityPoolConfigured, cityKeyFor, getCityPoolCandidates, contributePlaces } from '@/lib/cityPool';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import type { ItineraryItem, ItineraryRequest } from '../../src/lib/types';
+import { buildDayList, addDays, MAX_TRIP_DAYS } from '../../src/lib/dates';
+import { searchRedditMultiSource, isRedditConfigured } from '../../src/lib/reddit';
+import { clusterByDay } from '../../src/lib/clusterByDay';
+import { findReviewHighlights } from '../../src/lib/reviewHighlights';
+import { repairItinerary } from '../../src/lib/repairItinerary';
+import { searchEvents, isTicketmasterConfigured } from '../../src/lib/ticketmaster';
+import { mergePlaces } from '../../src/lib/mergePlaces';
+import { findOpeningHours } from '../../src/lib/openingHours';
+import { trimPlacesForPrompt } from '../../src/lib/trimPlacesForPrompt';
+import { annotateReviewEvidence } from '../../src/lib/reviewEvidence';
+import { generateItinerary } from '../../src/lib/generateItinerary';
+import type { RawPlace } from '../../src/lib/rawPlace';
+import { checkRateLimit, clientIp, tooManyRequests, TEN_MINUTES_MS } from '../../src/lib/rateLimit';
+import { FULL_BUILDS_PER_WINDOW } from '../../src/lib/limits';
+import { isCityPoolConfigured, cityKeyFor, getCityPoolCandidates, contributePlaces } from '../../src/lib/cityPool';
 
 const MAX_SPOTS = 50;
 const SCOPED_REGENS_PER_WINDOW = 20;
@@ -62,7 +63,8 @@ async function fetchPlaces(textQuery: string, targetCount: number): Promise<{ pl
   return { places };
 }
 
-export async function POST(request: Request) {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
+  installEnv(env);
   // Given back if the build fails on our side, so an outage doesn't use up the user's attempts.
   let refundAttempt = () => {};
 
@@ -71,22 +73,22 @@ export async function POST(request: Request) {
     const { location, days, startDate, perDayCounts, preferences, budget, travelParty, pace, transportation, sourceWeights, hiddenGemMode, optimizeRoutes, regenerateScope } = body;
 
     if (!location || typeof location !== 'string') {
-      return NextResponse.json({ error: 'location (string) is required' }, { status: 400 });
+      return Response.json({ error: 'location (string) is required' }, { status: 400 });
     }
     if (startDate !== undefined && typeof startDate !== 'string') {
-      return NextResponse.json({ error: 'startDate must be a YYYY-MM-DD string' }, { status: 400 });
+      return Response.json({ error: 'startDate must be a YYYY-MM-DD string' }, { status: 400 });
     }
     if (typeof days !== 'number' || days < 1 || days > MAX_TRIP_DAYS) {
-      return NextResponse.json({ error: `days must be between 1 and ${MAX_TRIP_DAYS}` }, { status: 400 });
+      return Response.json({ error: `days must be between 1 and ${MAX_TRIP_DAYS}` }, { status: 400 });
     }
     if (!Array.isArray(perDayCounts) || perDayCounts.length !== days) {
-      return NextResponse.json({ error: 'perDayCounts must have one entry per day' }, { status: 400 });
+      return Response.json({ error: 'perDayCounts must have one entry per day' }, { status: 400 });
     }
     const totalFoodNeeded = perDayCounts.reduce((sum, d) => sum + (d.food || 0), 0);
     const totalAttractionNeeded = perDayCounts.reduce((sum, d) => sum + (d.attraction || 0), 0);
     const totalSpots = totalFoodNeeded + totalAttractionNeeded;
     if (totalSpots < 1 || totalSpots > MAX_SPOTS) {
-      return NextResponse.json({ error: `Total spots across all days must be between 1 and ${MAX_SPOTS}` }, { status: 400 });
+      return Response.json({ error: `Total spots across all days must be between 1 and ${MAX_SPOTS}` }, { status: 400 });
     }
 
     // Rebuilding just one category after a single change (e.g. adding a diet restriction) is
@@ -150,7 +152,7 @@ export async function POST(request: Request) {
 
     if (foodResult.error && attractionResult.error) {
       refundAttempt();
-      return NextResponse.json({ error: 'Failed to fetch places' }, { status: 502 });
+      return Response.json({ error: 'Failed to fetch places' }, { status: 502 });
     }
 
     // Extra candidates accumulated from everyone's past trips to this same city, on top of
@@ -170,7 +172,7 @@ export async function POST(request: Request) {
 
     if (rawPlaces.length === 0) {
       refundAttempt();
-      return NextResponse.json({ error: 'No places found for this location' }, { status: 404 });
+      return Response.json({ error: 'No places found for this location' }, { status: 404 });
     }
     if (rawPlaces.length < totalSpots) {
       warnings.push(`Only found ${rawPlaces.length} unique candidate places for ${totalSpots} requested spots — some repetition may occur.`);
@@ -281,7 +283,7 @@ export async function POST(request: Request) {
     } catch (genError) {
       console.error('Both providers failed to generate an itinerary:', genError);
       refundAttempt();
-      return NextResponse.json({ error: 'Failed to generate itinerary' }, { status: 502 });
+      return Response.json({ error: 'Failed to generate itinerary' }, { status: 502 });
     }
 
     const { itinerary: repairedItinerary, hadUnresolvable } = repairItinerary(itinerary, foodResult.places, attractionResult.places);
@@ -308,17 +310,18 @@ export async function POST(request: Request) {
       openingHours: findOpeningHours(rawPlaces, item.name, item.address),
     }));
 
-    // Adds this trip's real places back to the shared pool for next time.
+    // Adds this trip's real places back to the shared pool for next time, after the response
+    // is sent rather than before, so a slow Supabase write never adds latency to the request.
     if (isCityPoolConfigured()) {
-      await contributePlaces(cityKey, itineraryWithReviews, 'google');
+      waitUntil(contributePlaces(cityKey, itineraryWithReviews, 'google'));
     }
 
     const response = { itinerary: itineraryWithReviews, warnings };
 
-    return NextResponse.json(response);
+    return Response.json(response);
   } catch (error) {
     console.error('API Error:', error);
     refundAttempt();
-    return NextResponse.json({ error: 'Failed to generate itinerary' }, { status: 500 });
+    return Response.json({ error: 'Failed to generate itinerary' }, { status: 500 });
   }
-}
+};

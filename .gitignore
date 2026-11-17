@@ -41,3 +41,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local secrets for wrangler pages dev, and local-only notes
+.dev.vars
+.wrangler/
+docs/
+GLOSSARY.md
+CONTEXT.md

@@ -43,9 +43,9 @@ import { DestinationAutocomplete } from '@/components/DestinationAutocomplete';
 import { ImportModal } from '@/components/ImportModal';
 import { sourcesForItem } from '@/lib/sources';
 import { getSpotEmoji } from '@/lib/spotEmoji';
-import { applyTranslation } from '@/lib/domTranslate';
 import { exportMapsCsv } from '@/lib/exportMapsCsv';
 import { exportIcal } from '@/lib/exportIcal';
+import { applyTranslation } from '@/lib/domTranslate';
 import {
   encodeTrip,
   decodeTrip,
@@ -199,7 +199,20 @@ interface BuiltConfig {
   optimizeRoutes: boolean;
 }
 
-export default function Home() {
+// The Maps key arrives from /api/config rather than being baked into the static
+// build, so the map waits for it before loading Google's script.
+function MapsApiProvider({ apiKey, language, children }: { apiKey: string; language: string; children: React.ReactNode }) {
+  if (!apiKey) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="animate-spin text-gray-400" size={28} />
+      </div>
+    );
+  }
+  return <APIProvider apiKey={apiKey} language={language}>{children}</APIProvider>;
+}
+
+export default function TripPlannerPage() {
   const [location, setLocation] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -225,6 +238,7 @@ export default function Home() {
     ticketmaster: 0,
   });
   const [sourceConfig, setSourceConfig] = useState<SourceConfig | null>(null);
+  const [mapsKey, setMapsKey] = useState('');
   const [lastBuiltConfig, setLastBuiltConfig] = useState<BuiltConfig | null>(null);
 
   const [loading, setLoading] = useState(false);
@@ -294,9 +308,19 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    document.documentElement.style.overscrollBehavior = 'none';
+    return () => {
+      document.documentElement.style.overscrollBehavior = '';
+    };
+  }, []);
+
+  useEffect(() => {
     fetch('/api/config')
       .then((res) => res.json())
-      .then(setSourceConfig)
+      .then((config: SourceConfig & { mapsKey?: string }) => {
+        setSourceConfig(config);
+        setMapsKey(config.mapsKey ?? '');
+      })
       .catch(() => setSourceConfig(null));
   }, []);
 
@@ -689,8 +713,9 @@ export default function Home() {
     language,
   };
 
+  // The page may be served below the domain root (for example when embedded), so keep the path in the link
   const shareUrl = shareEncoded
-    ? window.location.origin + '/' + buildShareHash(shareEncoded, currentShareOptions)
+    ? window.location.origin + window.location.pathname + buildShareHash(shareEncoded, currentShareOptions)
     : null;
 
   const openShare = async () => {
@@ -706,7 +731,7 @@ export default function Home() {
     // user actually clicks the button below — otherwise it'd read "Copied!" before they'd done
     // anything themselves.
     navigator.clipboard
-      .writeText(window.location.origin + '/' + buildShareHash(encoded, currentShareOptions))
+      .writeText(window.location.origin + window.location.pathname + buildShareHash(encoded, currentShareOptions))
       .catch(() => {});
 
     // Captures any custom places (a dropped pin, a typed address, an imported row) into the
@@ -795,7 +820,7 @@ export default function Home() {
       >
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            Itinerary Planner
+            AI Vacation Planner
           </h1>
           <div className="flex items-center gap-1.5">
             {itinerary.length > 0 && (
@@ -1319,7 +1344,7 @@ export default function Home() {
                 unambiguously beneath it (an explicit z-index of 0 doesn't reliably beat
                 z-index: auto — DOM order still wins ties — so both sides need real numbers). */}
             <div className="relative z-10 w-full h-full">
-            <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!} language={language}>
+            <MapsApiProvider apiKey={mapsKey} language={language}>
               <Map
                 key={mapKey + '-' + mobilePane}
                 style={{ width: '100%', height: '100%' }}
@@ -1382,7 +1407,7 @@ export default function Home() {
                   </InfoWindow>
                 )}
               </Map>
-            </APIProvider>
+            </MapsApiProvider>
             </div>
 
             {/* The InfoWindow is Google's own pane, nested inside the Map's DOM subtree —

@@ -1,4 +1,3 @@
-import { NextResponse } from 'next/server';
 import { RATE_WINDOW_MS } from './limits';
 
 export const TEN_MINUTES_MS = RATE_WINDOW_MS;
@@ -52,15 +51,15 @@ export function checkRateLimit(key: string, max: number, windowMs: number): Rate
   };
 }
 
-export function tooManyRequests(message: string, retryAfterSeconds: number): NextResponse {
-  return NextResponse.json(
+export function tooManyRequests(message: string, retryAfterSeconds: number): Response {
+  return Response.json(
     { error: message, retryAfterSeconds },
     { status: 429, headers: { 'Retry-After': String(retryAfterSeconds) } },
   );
 }
 
 // A plain per-IP cap for endpoints that proxy a paid API, so nobody can hammer them.
-export function enforceRateLimit(request: Request, bucket: string, max: number): NextResponse | null {
+export function enforceRateLimit(request: Request, bucket: string, max: number): Response | null {
   const result = checkRateLimit(`${bucket}:${clientIp(request)}`, max, TEN_MINUTES_MS);
   if (result.ok) return null;
   const minutes = Math.ceil(result.retryAfterSeconds / 60);

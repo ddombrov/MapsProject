@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import { enforceRateLimit } from '@/lib/rateLimit';
-import { decodePolyline } from '@/lib/polyline';
+/// <reference types="@cloudflare/workers-types" />
+import { installEnv, type Env } from './_env';
+import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { decodePolyline } from '../../src/lib/polyline';
 
 interface LatLng {
   lat: number;
@@ -9,7 +10,8 @@ interface LatLng {
 
 const toWaypoint = (p: LatLng) => ({ location: { latLng: { latitude: p.lat, longitude: p.lng } } });
 
-export async function POST(request: Request) {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+  installEnv(env);
   const limited = enforceRateLimit(request, 'directions', 300);
   if (limited) return limited;
 
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
     const { waypoints, mode } = (await request.json()) as { waypoints?: LatLng[]; mode?: 'DRIVE' | 'WALK' };
 
     if (!waypoints || waypoints.length < 2) {
-      return NextResponse.json({ error: 'At least 2 waypoints are required' }, { status: 400 });
+      return Response.json({ error: 'At least 2 waypoints are required' }, { status: 400 });
     }
 
     const origin = waypoints[0];
@@ -42,14 +44,14 @@ export async function POST(request: Request) {
     if (!res.ok) {
       const errText = await res.text();
       console.error('Routes API error:', errText);
-      return NextResponse.json({ error: 'Could not compute route' }, { status: 502 });
+      return Response.json({ error: 'Could not compute route' }, { status: 502 });
     }
 
-    const data = await res.json();
+    const data = (await res.json()) as any;
     const encoded = data.routes?.[0]?.polyline?.encodedPolyline;
 
     if (!encoded) {
-      return NextResponse.json({ error: 'No route found between these stops' }, { status: 404 });
+      return Response.json({ error: 'No route found between these stops' }, { status: 404 });
     }
 
     // One leg per hop between consecutive waypoints; duration comes back like "743s".
@@ -58,9 +60,9 @@ export async function POST(request: Request) {
       distanceMeters: leg.distanceMeters ?? 0,
     }));
 
-    return NextResponse.json({ path: decodePolyline(encoded), legs });
+    return Response.json({ path: decodePolyline(encoded), legs });
   } catch (error) {
     console.error('Directions error:', error);
-    return NextResponse.json({ error: 'Failed to compute route' }, { status: 500 });
+    return Response.json({ error: 'Failed to compute route' }, { status: 500 });
   }
-}
+};

@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 
 interface GeocodeResult {
   formatted_address: string;
@@ -25,7 +25,7 @@ function findLocality(results: GeocodeResult[]): string | null {
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
-  const limited = enforceRateLimit(request, 'geocode', 200);
+  const limited = await limitRequest(env, request, 'geocode', 200);
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);

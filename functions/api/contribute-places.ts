@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
 import type { ItineraryItem } from '../../src/lib/types';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 import { isCityPoolConfigured, cityKeyFor, contributePlaces } from '../../src/lib/cityPool';
 
 // Called when a trip is shared (see openShare in page.tsx), on top of the automatic
@@ -12,7 +12,7 @@ import { isCityPoolConfigured, cityKeyFor, contributePlaces } from '../../src/li
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUntil }) => {
   installEnv(env);
 
-  const limited = enforceRateLimit(request, 'contribute-places', 30);
+  const limited = await limitRequest(env, request, 'contribute-places', 30);
   if (limited) return limited;
 
   if (!isCityPoolConfigured()) return Response.json({ ok: true });

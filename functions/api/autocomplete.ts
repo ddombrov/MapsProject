@@ -1,10 +1,10 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
-  const limited = enforceRateLimit(request, 'autocomplete', 400);
+  const limited = await limitRequest(env, request, 'autocomplete', 400);
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);

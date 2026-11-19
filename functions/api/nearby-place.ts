@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 
 interface NearbySearchResult {
   places?: Array<{
@@ -17,7 +17,7 @@ const RADIUS_METERS = 40;
 
 export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
-  const limited = enforceRateLimit(request, 'nearby-place', 100);
+  const limited = await limitRequest(env, request, 'nearby-place', 100);
   if (limited) return limited;
 
   const { searchParams } = new URL(request.url);

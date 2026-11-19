@@ -8,6 +8,7 @@ export interface Env {
   TICKETMASTER_API_KEY?: string;
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  PLANNER_USAGE?: KVNamespace;
 }
 
 // The planner's server code (src/lib) was written against

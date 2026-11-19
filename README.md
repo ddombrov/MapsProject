@@ -7,6 +7,10 @@ day-by-day itinerary of food and attractions from real Google Places data, optio
 blended with Reddit opinions and Ticketmaster events. Then edit it on a map, calendar or
 table, and share it with a link.
 
+![A three-day Toronto itinerary on the map](docs/screenshots/map.jpg)
+
+![The same trip on the calendar](docs/screenshots/calendar.jpg)
+
 ## Features
 
 - **Generate** up to 7 days and 50 places, with per-day food and attraction counts. Steer it
@@ -67,9 +71,11 @@ back. The part after `#` is never sent to a server.
 - Trips are limited to 7 days and 50 places.
 - Each browser can build 5 full trips per 10 minutes (kept in `localStorage`). Regenerating
   a single category does not count.
-- The API routes also count requests per IP address as a backstop. That counter lives in
-  server memory, so on a serverless host each instance keeps its own count. Treat it as a
-  speed bump, and use your providers' own quotas as the real limit.
+- The API routes count requests per IP address per 10 minutes, and per route per day across
+  the whole site, in Workers KV (the `PLANNER_USAGE` binding in `wrangler.toml`), so every
+  instance shares the counts. The daily caps in `functions/api/_limits.ts` keep Google within
+  its free allowance; for example, 5 full trip builds a day. Without the binding (local
+  development) the limits fall back to a counter in server memory.
 
 ## Development
 

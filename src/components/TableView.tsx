@@ -32,6 +32,16 @@ export function TableView({ itinerary, selectedSpot, onSelect, actions, onMoveIt
 
   const rows = [...itinerary].sort((a, b) => a.day - b.day || SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot]);
 
+  if (rows.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-16 text-gray-500">
+        {/* eslint-disable-next-line @next/next/no-img-element -- static export with unoptimized images; a plain img is simplest */}
+        <img src="/icons/beach.png" alt="" width={160} height={160} className="w-40 h-40" />
+        <p className="text-sm">Build a trip plan to see every stop here.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 max-w-5xl mx-auto">
       {actions && <div className="flex justify-end">{actions}</div>}

@@ -13,7 +13,7 @@ import { trimPlacesForPrompt } from '../../src/lib/trimPlacesForPrompt';
 import { annotateReviewEvidence } from '../../src/lib/reviewEvidence';
 import { generateItinerary } from '../../src/lib/generateItinerary';
 import type { RawPlace } from '../../src/lib/rawPlace';
-import { checkRateLimit, clientIp, tooManyRequests, TEN_MINUTES_MS } from '../../src/lib/rateLimit';
+import { countRequest } from './_limits';
 import { FULL_BUILDS_PER_WINDOW } from '../../src/lib/limits';
 import { isCityPoolConfigured, cityKeyFor, getCityPoolCandidates, contributePlaces } from '../../src/lib/cityPool';
 
@@ -97,22 +97,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, waitUnti
     const isScopedRegen =
       (regenerateScope === 'Food' && totalFoodNeeded > 0 && totalAttractionNeeded === 0) ||
       (regenerateScope === 'Attraction' && totalAttractionNeeded > 0 && totalFoodNeeded === 0);
-    const limit = checkRateLimit(
-      (isScopedRegen ? 'itinerary-scoped:' : 'itinerary-full:') + clientIp(request),
+    const limit = await countRequest(
+      env,
+      request,
+      isScopedRegen ? 'itinerary-scoped' : 'itinerary-full',
       isScopedRegen ? SCOPED_REGENS_PER_WINDOW : FULL_BUILDS_PER_WINDOW,
-      TEN_MINUTES_MS,
-    );
-    if (!limit.ok) {
-      const minutes = Math.ceil(limit.retryAfterSeconds / 60);
-      const wait = 'about ' + minutes + ' minute' + (minutes === 1 ? '' : 's');
-      return tooManyRequests(
-        isScopedRegen
+      (minutes) => {
+        const wait = 'about ' + minutes + ' minute' + (minutes === 1 ? '' : 's');
+        return isScopedRegen
           ? 'Too many quick updates in a row. Please wait ' + wait + '.'
-          : 'You can build ' + FULL_BUILDS_PER_WINDOW + ' trips every 10 minutes. Try again in ' + wait + '.',
-        limit.retryAfterSeconds,
-      );
-    }
-    refundAttempt = limit.refund;
+          : 'You can build ' + FULL_BUILDS_PER_WINDOW + ' trips every 10 minutes. Try again in ' + wait + '.';
+      },
+    );
+    if (!limit.ok) return limit.response;
+    refundAttempt = () => { waitUntil(limit.refund()); };
 
     const warnings: string[] = [];
     const weights = { ...sourceWeights };

@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 import { interpretChatMessage } from '../../src/lib/chatActions';
 import { pickOpeningHours } from '../../src/lib/openingHours';
 import type { RawPlace } from '../../src/lib/rawPlace';
@@ -36,7 +36,7 @@ async function searchPlaces(textQuery: string): Promise<SearchPlace[] | null> {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
-  const limited = enforceRateLimit(request, 'chat', 30);
+  const limited = await limitRequest(env, request, 'chat', 30);
   if (limited) return limited;
 
   try {

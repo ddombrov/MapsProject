@@ -1,6 +1,6 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 import { decodePolyline } from '../../src/lib/polyline';
 
 interface LatLng {
@@ -12,7 +12,7 @@ const toWaypoint = (p: LatLng) => ({ location: { latLng: { latitude: p.lat, long
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
-  const limited = enforceRateLimit(request, 'directions', 300);
+  const limited = await limitRequest(env, request, 'directions', 300);
   if (limited) return limited;
 
   try {

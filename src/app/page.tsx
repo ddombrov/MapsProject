@@ -820,6 +820,8 @@ export default function TripPlannerPage() {
       >
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static export with unoptimized images; a plain img is simplest */}
+            <img src="/icons/palm.png" alt="" width={32} height={32} className="w-8 h-8" />
             AI Vacation Planner
           </h1>
           <div className="flex items-center gap-1.5">

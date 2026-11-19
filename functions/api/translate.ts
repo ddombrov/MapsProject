@@ -1,7 +1,7 @@
 /// <reference types="@cloudflare/workers-types" />
 import { installEnv, type Env } from './_env';
 import { translateTexts } from '../../src/lib/translate';
-import { enforceRateLimit } from '../../src/lib/rateLimit';
+import { limitRequest } from './_limits';
 
 const MAX_TEXTS_PER_REQUEST = 200;
 
@@ -13,7 +13,7 @@ const MAX_TEXTS_PER_REQUEST = 200;
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   installEnv(env);
 
-  const limited = enforceRateLimit(request, 'translate', 30);
+  const limited = await limitRequest(env, request, 'translate', 30);
   if (limited) return limited;
 
   try {
